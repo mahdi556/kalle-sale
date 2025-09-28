@@ -1,42 +1,33 @@
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* رنگ متن و پس‌زمینه منوهای کشویی */
+.form-select, .form-select option {
+  color: #000;            /* متن سیاه */
+  background-color: #fff; /* پس‌زمینه سفید */
+  font-size: 1rem;        /* اندازه مناسب فونت */
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* wrapper برای ردیف‌های فاکتور که در دسکتاپ بزرگ scroll شود */
+.invoice-row-wrapper {
+  overflow-x: auto;
+  width: 100%;
+}
+
+/* کمی فاصله و اندازه فونت بهتر در موبایل */
+@media (max-width: 768px) {
+  .form-select {
+    font-size: 1.1rem;
   }
 }
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
+.fade-enter {
+  opacity: 0;
 }
-
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+.fade-enter-active {
+  opacity: 1;
+  transition: opacity 300ms;
 }
-
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+.fade-exit {
+  opacity: 1;
 }
-
-a {
-  color: inherit;
-  text-decoration: none;
-}
-
-@media (prefers-color-scheme: dark) {
-  html {
-    color-scheme: dark;
-  }
+.fade-exit-active {
+  opacity: 0;
+  transition: opacity 300ms;
 }

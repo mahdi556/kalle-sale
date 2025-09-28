@@ -1,0 +1,17 @@
+[
+  { "id": 1, "name": "عسل طبیعی", "code": "ASL001", "weight": 1, "price": 200000 },
+  { "id": 2, "name": "عسل گون", "code": "GON002", "weight": 1, "price": 250000 },
+  { "id": 3, "name": "عسل چهل گیاه", "code": "CH40", "weight": 1, "price": 300000 },
+  { "id": 4, "name": "عسل کنار", "code": "KAN004", "weight": 1, "price": 220000 },
+  { "id": 5, "name": "عسل مرکبات", "code": "MER005", "weight": 1, "price": 210000 },
+  { "id": 6, "name": "عسل گون طبیعی", "code": "GON006", "weight": 1, "price": 260000 },
+  { "id": 7, "name": "عسل کنار کوهی", "code": "KAN007", "weight": 1, "price": 230000 },
+  { "id": 8, "name": "عسل بهارنارنج", "code": "BAH008", "weight": 1, "price": 240000 },
+  { "id": 9, "name": "عسل آویشن", "code": "AVI009", "weight": 1, "price": 270000 },
+  { "id": 10, "name": "عسل مرکبات طبیعی", "code": "MER010", "weight": 1, "price": 215000 },
+  { "id": 11, "name": "عسل شبدر", "code": "SHB011", "weight": 1, "price": 225000 },
+  { "id": 12, "name": "عسل یونجه", "code": "YON012", "weight": 1, "price": 235000 },
+  { "id": 13, "name": "عسل اکالیپتوس", "code": "EUK013", "weight": 1, "price": 280000 },
+  { "id": 14, "name": "عسل گشنیز", "code": "GSH014", "weight": 1, "price": 260000 },
+  { "id": 15, "name": "عسل شوید", "code": "SHD015", "weight": 1, "price": 240000 }
+]
