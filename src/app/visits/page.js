@@ -1,5 +1,5 @@
 import { db } from "../../../lib/db";
-import VisitsClient from "./VisitsClient";
+import VisitsClient from "../../components/visits/VisitsClient";
 
 export default async function VisitsPage() {
   // دریافت مسیرها از دیتابیس

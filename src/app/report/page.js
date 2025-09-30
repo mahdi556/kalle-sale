@@ -1,4 +1,4 @@
-import ReportClient from "./ReportClient";
+import ReportClient from "../../components/report/ReportClient";
 
 export default function ReportPage() {
   return <ReportClient />;

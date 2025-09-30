@@ -1,5 +1,5 @@
 import { db } from "../../../lib/db";
-import StoresClient from "./StoresClient";
+import StoresClient from "../../components/stores/StoresClient";
 
 export default async function StoresPage() {
   const [rows] = await db.query(`

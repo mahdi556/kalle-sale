@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Form, Button, Table } from "react-bootstrap";
-import products from "../products.json"; // مسیر فایل JSON محصولات
+import products from "../../products.json"; // مسیر فایل JSON محصولات
 
 export default function VisitsClient({ routes }) {
   const [selectedRoute, setSelectedRoute] = useState("");
