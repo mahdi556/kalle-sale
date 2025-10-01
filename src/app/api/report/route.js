@@ -1,10 +1,12 @@
 import { db } from "../../../../lib/db";
+import products from "../../../products.json";
 
 export async function GET(req) {
   try {
     const { searchParams } = new URL(req.url);
     const date = searchParams.get("date") || new Date().toISOString().slice(0, 10);
 
+    // دریافت بازدیدها
     const [rows] = await db.query(
       `SELECT v.id AS visit_id, v.note, v.has_invoice, v.next_tour,
               s.id AS store_id, s.name AS store_name, r.name AS route_name
@@ -23,15 +25,23 @@ export async function GET(req) {
 
       if (v.has_invoice) {
         const [items] = await db.query(
-          `SELECT ii.quantity, p.code AS product_code, p.name AS product_name, 
-                  p.weight, p.price
+          `SELECT ii.quantity, ii.product_id, ii.price
            FROM invoice_items ii
-           JOIN products p ON ii.product_id = p.id
            JOIN invoices i ON ii.invoice_id = i.id
            WHERE i.visit_id = ?`,
           [v.visit_id]
         );
-        invoices = items;
+
+        invoices = items.map(item => {
+          const product = products.find(p => Number(p.id) === Number(item.product_id));
+          return {
+            product_code: product?.code || "نامشخص",
+            product_name: product?.name || "نامشخص",
+            weight: product?.weight || 0,
+            price: item.price,
+            quantity: item.quantity
+          };
+        });
       }
 
       stores.push({
@@ -47,8 +57,6 @@ export async function GET(req) {
     return new Response(JSON.stringify({ ok: true, stores }));
   } catch (err) {
     console.error("❌ Error fetching report:", err);
-    return new Response(JSON.stringify({ ok: false, error: err.message }), {
-      status: 500,
-    });
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500 });
   }
 }

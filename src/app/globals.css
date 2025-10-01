@@ -1,3 +1,21 @@
+@font-face {
+  font-family: "Vazir";
+  src: url(../../public/fonts/Vazir.eot);
+  /* IE9 Compat Modes */
+  src: url(../../public/fonts/Vazir.eot) format("embedded-opentype"),
+    url(../../public/fonts/Vazir.woff2) format("woff2"),
+    url(../../public/fonts/Vazir.woff) format("woff"),
+    url(../../public/fonts/Vazir.ttf) format("truetype");
+  /* Safari, Android, iOS */
+}
+
+body {
+  font-family: "Vazir", sans-serif !important;
+  color: #0c0c0c;
+  background-color: #ffffff;
+  overflow-x: hidden;
+}
+
 /* رنگ متن و پس‌زمینه منوهای کشویی */
 .form-select, .form-select option {
   color: #000;            /* متن سیاه */

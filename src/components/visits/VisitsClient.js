@@ -26,7 +26,7 @@ export default function VisitsClient({ routes }) {
   const addItem = () => {
     setInvoiceItems([
       ...invoiceItems,
-      { product_id: "", product_input: "", quantity: 1, weight: 0, price: 0 },
+      { product_id: 0, product_input: "", quantity: 1, weight: 0, price: 0 },
     ]);
   };
 
@@ -38,7 +38,11 @@ export default function VisitsClient({ routes }) {
 
   const updateItem = (index, field, value) => {
     const items = [...invoiceItems];
-    items[index][field] = value;
+    if (["product_id", "quantity", "price", "weight"].includes(field)) {
+      items[index][field] = Number(value);
+    } else {
+      items[index][field] = value;
+    }
     setInvoiceItems(items);
   };
 
@@ -78,42 +82,27 @@ export default function VisitsClient({ routes }) {
   const handleInvoiceSubmit = async () => {
     if (!selectedStore) return alert("یک فروشگاه انتخاب کنید.");
 
-    // فقط ردیف‌هایی که product_id و quantity دارند
     const items = invoiceItems.filter(
       (i) => Number(i.product_id) > 0 && Number(i.quantity) > 0
     );
+
     if (items.length === 0) return alert("حداقل یک ردیف فاکتور باید پر شود!");
 
     try {
-      // ثبت بازدید با has_invoice = true و next_tour = false
-      const visitRes = await fetch("/api/visits", {
+      const res = await fetch("/api/invoices", {
         method: "POST",
         body: JSON.stringify({
-          storeId: selectedStore,
-          visited: true,
-          nextTour: false,
+          storeId: selectedStore, // مهم: ارسال storeId
+          items,
           note: visitNote,
-          has_invoice: true,
+          visitNote,
+          nextTour,
         }),
         headers: { "Content-Type": "application/json" },
       });
 
-      const visitData = await visitRes.json();
-      if (!visitData.ok) throw new Error("خطا در ثبت بازدید برای فاکتور");
-
-      const visitId = visitData.visitId;
-      if (!visitId) throw new Error("شناسه بازدید معتبر نیست");
-
-      // ثبت فاکتور با visitId
-      const invoiceRes = await fetch("/api/invoices", {
-        method: "POST",
-        body: JSON.stringify({ visitId, items, note: visitNote }),
-        headers: { "Content-Type": "application/json" },
-      });
-
-      const invoiceData = await invoiceRes.json();
-      if (!invoiceData.ok)
-        throw new Error(invoiceData.error || "خطا در ثبت فاکتور");
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "خطا در ثبت فاکتور");
 
       alert("بازدید و فاکتور با موفقیت ثبت شد ✅");
       resetForm();
@@ -127,9 +116,7 @@ export default function VisitsClient({ routes }) {
 
     if (value.length >= 3) {
       const filtered = products.filter(
-        (p) =>
-          p.name.includes(value) ||
-          p.code.includes(value)
+        (p) => p.name.includes(value) || p.code.includes(value)
       );
       setSuggestions(filtered);
     } else {
@@ -138,10 +125,10 @@ export default function VisitsClient({ routes }) {
   };
 
   const selectProduct = (index, product) => {
-    updateItem(index, "product_id", product.id);
+    updateItem(index, "product_id", Number(product.id));
     updateItem(index, "product_input", product.name);
-    updateItem(index, "price", product.price);
-    updateItem(index, "weight", product.weight);
+    updateItem(index, "price", Number(product.price));
+    updateItem(index, "weight", Number(product.weight));
     setSuggestions([]);
   };
 
@@ -322,9 +309,9 @@ export default function VisitsClient({ routes }) {
                 + افزودن کالا
               </Button>
 
-              {/* مجموع مبلغ فاکتور */}
               <div className="mt-2">
-                <strong>مجموع مبلغ فاکتور: </strong> {totalAmount.toLocaleString()} تومان
+                <strong>مجموع مبلغ فاکتور: </strong>{" "}
+                {totalAmount.toLocaleString()} تومان
               </div>
             </>
           )}

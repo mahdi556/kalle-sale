@@ -1,83 +1,94 @@
 import { db } from "../../../../lib/db";
+import products from "../../../products.json"; // مسیر فایل JSON
 
 export async function POST(req) {
+  const connection = await db.getConnection();
+  await connection.beginTransaction();
+
   try {
-    const { visitId, items, note } = await req.json();
+    const { storeId, visitId, items, note, visitNote, nextTour = false } = await req.json();
 
-    if (!visitId) {
-      return new Response(
-        JSON.stringify({ ok: false, error: "شناسه بازدید معتبر نیست" }),
-        { status: 400 }
-      );
+    if (!storeId && !visitId) {
+      throw new Error("شناسه فروشگاه یا بازدید معتبر نیست");
     }
 
-    if (!items || items.length === 0) {
-      return new Response(
-        JSON.stringify({ ok: false, error: "فاکتور خالی است" }),
-        { status: 400 }
+    // 1️⃣ ثبت یا بروزرسانی بازدید
+    let visitIdToUse = visitId;
+
+    if (!visitIdToUse) {
+      // چک اگر بازدید امروز وجود دارد
+      const [existing] = await connection.query(
+        "SELECT id, has_invoice FROM visits WHERE store_id = ? AND visit_date = CURDATE()",
+        [storeId]
       );
+
+      if (existing.length === 0) {
+        // ثبت بازدید جدید
+        const [visitResult] = await connection.query(
+          `INSERT INTO visits (store_id, visit_date, has_invoice, next_tour, note)
+           VALUES (?, CURDATE(), ${items?.length > 0 ? true : false}, ?, ?)`,
+          [storeId, nextTour ? true : false, visitNote || null]
+        );
+        visitIdToUse = visitResult.insertId;
+      } else {
+        // بروزرسانی بازدید موجود
+        await connection.query(
+          `UPDATE visits SET has_invoice = ${items?.length > 0 ? true : existing[0].has_invoice}, next_tour = ?, note = ? WHERE id = ?`,
+          [nextTour ? true : false, visitNote || null, existing[0].id]
+        );
+        visitIdToUse = existing[0].id;
+      }
     }
 
-    // 1️⃣ ثبت فاکتور
-    const [result] = await db.query(
-      `INSERT INTO invoices (visit_id, invoice_date, note) 
-       VALUES (?, CURDATE(), ?)`,
-      [visitId, note || null]
-    );
-
-    const invoiceId = result.insertId;
-    console.log("Created invoiceId:", invoiceId);
-
+    let invoiceId = null;
     let totalAmount = 0;
 
-    // 2️⃣ ثبت ردیف‌های فاکتور
-    for (const item of items) {
-      const productId = Number(item.product_id);
-      const quantity = Number(item.quantity);
-
-      if (!productId || !quantity) continue;
-
-      // بررسی موجود بودن محصول
-      const [rows] = await db.query(
-        "SELECT price FROM products WHERE id = ?",
-        [productId]
+    // 2️⃣ اگر آیتم فاکتور وجود داشت، ثبت فاکتور و ردیف‌ها
+    if (items && items.length > 0) {
+      const [invoiceResult] = await connection.query(
+        `INSERT INTO invoices (visit_id, invoice_date, note) VALUES (?, CURDATE(), ?)`,
+        [visitIdToUse, note || null]
       );
-      if (rows.length === 0) {
-        console.warn(`Product not found: ${productId}`);
-        continue;
+      invoiceId = invoiceResult.insertId;
+
+      for (const item of items) {
+        const productId = Number(item.product_id);
+        const quantity = Number(item.quantity);
+
+        if (!productId || !quantity) continue;
+
+        const product = products.find(p => Number(p.id) === productId);
+        if (!product) {
+          console.warn(`Product not found in JSON: ${productId}`);
+          continue;
+        }
+
+        const price = Number(product.price);
+        totalAmount += price * quantity;
+
+        await connection.query(
+          `INSERT INTO invoice_items (invoice_id, product_id, quantity, price)
+           VALUES (?, ?, ?, ?)`,
+          [invoiceId, productId, quantity, price]
+        );
       }
 
-      const price = rows[0].price;
-      totalAmount += price * quantity;
-
-      // ثبت در invoice_items
-      await db.query(
-        `INSERT INTO invoice_items (invoice_id, product_id, quantity) 
-         VALUES (?, ?, ?)`,
-        [invoiceId, productId, quantity]
+      // آپدیت مبلغ کل فاکتور
+      await connection.query(
+        "UPDATE invoices SET total_amount = ? WHERE id = ?",
+        [totalAmount, invoiceId]
       );
-      console.log("Inserted invoice_item:", { invoiceId, productId, quantity });
     }
 
-    // 3️⃣ آپدیت مبلغ کل فاکتور
-    await db.query(
-      "UPDATE invoices SET total_amount = ? WHERE id = ?",
-      [totalAmount, invoiceId]
-    );
+    // ✅ commit تراکنش
+    await connection.commit();
 
-    // 4️⃣ آپدیت وضعیت بازدید
-    await db.query(
-      "UPDATE visits SET has_invoice = TRUE, next_tour = FALSE WHERE id = ?",
-      [visitId]
-    );
-
-    console.log("Invoice items saved, total amount:", totalAmount);
-
-    return new Response(JSON.stringify({ ok: true, invoiceId }));
+    return new Response(JSON.stringify({ ok: true, visitId: visitIdToUse, invoiceId }), { status: 200 });
   } catch (err) {
-    console.error("❌ Error saving invoice:", err);
-    return new Response(JSON.stringify({ ok: false, error: err.message }), {
-      status: 500,
-    });
+    await connection.rollback();
+    console.error("❌ Transaction failed:", err);
+    return new Response(JSON.stringify({ ok: false, error: err.message }), { status: 500 });
+  } finally {
+    connection.release();
   }
 }
