@@ -1,224 +1,129 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Form, Button, Table } from "react-bootstrap";
-import products from "../../products.json"; // مسیر فایل JSON محصولات
+import { useState } from "react";
+import { Button, Table, Form, Modal } from "react-bootstrap";
+import StoreAutoComplete from "./StoreAutoComplete";
+import ProductAutoCompleteModal from "./ProductAutoCompleteModal";
+import products from "../../products.json";
 
-export default function VisitsClient({ routes }) {
-  const [selectedRoute, setSelectedRoute] = useState("");
-  const [stores, setStores] = useState([]);
-  const [selectedStore, setSelectedStore] = useState("");
+export default function VisitsClient() {
+  const [selectedStore, setSelectedStore] = useState(null);
   const [visitNote, setVisitNote] = useState("");
-  const [nextTour, setNextTour] = useState(false);
   const [invoiceItems, setInvoiceItems] = useState([]);
-  const [creatingInvoice, setCreatingInvoice] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [showNextTourModal, setShowNextTourModal] = useState(false);
 
-  useEffect(() => {
-    if (!selectedRoute) return;
+  // افزودن کالا از مدال
+  const handleAddProduct = (item) => {
+    if (!item || !item.product_id) return;
 
-    fetch(`/api/stores?routeId=${selectedRoute}`)
-      .then((res) => res.json())
-      .then((data) => setStores(data.stores || []))
-      .catch((err) => console.error("خطا در دریافت فروشگاه‌ها", err));
-  }, [selectedRoute]);
-
-  const addItem = () => {
-    setInvoiceItems([
-      ...invoiceItems,
-      { product_id: 0, product_input: "", quantity: 1, weight: 0, price: 0 },
-    ]);
-  };
-
-  const removeItem = (index) => {
-    const items = [...invoiceItems];
-    items.splice(index, 1);
-    setInvoiceItems(items);
-  };
-
-  const updateItem = (index, field, value) => {
-    const items = [...invoiceItems];
-    if (["product_id", "quantity", "price", "weight"].includes(field)) {
-      items[index][field] = Number(value);
-    } else {
-      items[index][field] = value;
-    }
-    setInvoiceItems(items);
-  };
-
-  const resetForm = () => {
-    setSelectedRoute("");
-    setSelectedStore("");
-    setVisitNote("");
-    setNextTour(false);
-    setInvoiceItems([]);
-    setCreatingInvoice(false);
-    setSuggestions([]);
-  };
-
-  const handleVisitSubmit = async () => {
-    if (!selectedStore) return alert("یک فروشگاه انتخاب کنید.");
-
-    const res = await fetch("/api/visits", {
-      method: "POST",
-      body: JSON.stringify({
-        storeId: selectedStore,
-        visited: true,
-        nextTour,
-        note: visitNote,
-      }),
-      headers: { "Content-Type": "application/json" },
+    setInvoiceItems((prevItems) => {
+      const index = prevItems.findIndex(i => i.product_id === item.product_id);
+      if (index !== -1) {
+        // اگر قبلاً اضافه شده، فقط تعدادش را تغییر بده
+        const updatedItems = [...prevItems];
+        updatedItems[index].quantity = item.quantity > 0 ? item.quantity : 1;
+        return updatedItems;
+      } else {
+        return [...prevItems, { ...item, quantity: item.quantity > 0 ? item.quantity : 1 }];
+      }
     });
-
-    const data = await res.json();
-    if (data.ok) {
-      alert("بازدید ثبت شد ✅");
-      resetForm();
-    } else {
-      alert("خطا در ثبت بازدید: " + data.error);
-    }
   };
 
+  // حذف کالا از جدول
+  const removeItem = (index) => {
+    setInvoiceItems((prevItems) => {
+      const items = [...prevItems];
+      items.splice(index, 1);
+      return items;
+    });
+  };
+
+  // ثبت نهایی فاکتور
   const handleInvoiceSubmit = async () => {
     if (!selectedStore) return alert("یک فروشگاه انتخاب کنید.");
-
-    const items = invoiceItems.filter(
-      (i) => Number(i.product_id) > 0 && Number(i.quantity) > 0
-    );
-
-    if (items.length === 0) return alert("حداقل یک ردیف فاکتور باید پر شود!");
+    if (invoiceItems.length === 0) return alert("حداقل یک کالا باید انتخاب شود.");
 
     try {
       const res = await fetch("/api/invoices", {
         method: "POST",
         body: JSON.stringify({
-          storeId: selectedStore, // مهم: ارسال storeId
-          items,
+          storeId: selectedStore.id,
+          items: invoiceItems,
           note: visitNote,
-          visitNote,
-          nextTour,
+          nextTour: false,
         }),
         headers: { "Content-Type": "application/json" },
       });
-
       const data = await res.json();
       if (!data.ok) throw new Error(data.error || "خطا در ثبت فاکتور");
 
-      alert("بازدید و فاکتور با موفقیت ثبت شد ✅");
-      resetForm();
+      alert("✅ فاکتور ثبت شد");
+      setSelectedStore(null);
+      setVisitNote("");
+      setInvoiceItems([]);
     } catch (err) {
       alert("خطا: " + err.message);
     }
   };
 
-  const handleProductInput = (index, value) => {
-    updateItem(index, "product_input", value);
+  // ثبت تور بعد با توضیحات
+  const handleNextTourSubmit = async () => {
+    if (!selectedStore) return alert("یک فروشگاه انتخاب کنید.");
 
-    if (value.length >= 3) {
-      const filtered = products.filter(
-        (p) => p.name.includes(value) || p.code.includes(value)
-      );
-      setSuggestions(filtered);
-    } else {
-      setSuggestions([]);
+    try {
+      const res = await fetch("/api/visits", {
+        method: "POST",
+        body: JSON.stringify({
+          storeId: selectedStore.id,
+          visited: true,
+          nextTour: true,
+          note: visitNote,
+          has_invoice: false,
+        }),
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!data.ok) throw new Error(data.error || "خطا در ثبت تور بعد");
+
+      alert("✅ تور بعد با توضیحات ثبت شد");
+      setSelectedStore(null);
+      setVisitNote("");
+      setShowNextTourModal(false);
+    } catch (err) {
+      alert("خطا: " + err.message);
     }
   };
 
-  const selectProduct = (index, product) => {
-    updateItem(index, "product_id", Number(product.id));
-    updateItem(index, "product_input", product.name);
-    updateItem(index, "price", Number(product.price));
-    updateItem(index, "weight", Number(product.weight));
-    setSuggestions([]);
-  };
-
-  // محاسبه مجموع مبلغ فاکتور
-  const totalAmount = invoiceItems.reduce((sum, item) => {
-    const price = Number(item.price) || 0;
-    const quantity = Number(item.quantity) || 0;
-    return sum + price * quantity;
-  }, 0);
+  const totalAmount = invoiceItems.reduce(
+    (sum, item) => sum + (item.price || 0) * (item.quantity || 0),
+    0
+  );
 
   return (
     <div className="container my-4">
       <h1 className="mb-4">📍 ثبت بازدید و فاکتور</h1>
 
-      <Form.Group className="mb-3">
-        <Form.Label>انتخاب مسیر:</Form.Label>
-        <Form.Select
-          value={selectedRoute}
-          onChange={(e) => setSelectedRoute(e.target.value)}
-        >
-          <option value="">-- انتخاب مسیر --</option>
-          {routes.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </Form.Select>
-      </Form.Group>
+      {/* انتخاب فروشگاه */}
+      <StoreAutoComplete onSelect={setSelectedStore} />
 
-      {selectedRoute && (
+      {selectedStore && (
         <>
-          <Form.Group className="mb-3">
-            <Form.Label>انتخاب فروشگاه:</Form.Label>
-            <Form.Select
-              value={selectedStore}
-              onChange={(e) => setSelectedStore(e.target.value)}
-            >
-              <option value="">-- انتخاب فروشگاه --</option>
-              {stores.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </Form.Select>
-          </Form.Group>
-
-          <Form.Group className="mb-3">
-            <Form.Label>توضیح (اختیاری):</Form.Label>
-            <Form.Control
-              value={visitNote}
-              onChange={(e) => setVisitNote(e.target.value)}
-            />
-          </Form.Group>
-
-          {!creatingInvoice && (
-            <>
-              <Form.Check
-                type="checkbox"
-                label="تور بعد"
-                checked={nextTour}
-                onChange={(e) => setNextTour(e.target.checked)}
-              />
-              {!nextTour && (
-                <Button
-                  variant="secondary"
-                  className="mt-2"
-                  onClick={() => setCreatingInvoice(true)}
-                >
-                  ایجاد فاکتور
-                </Button>
-              )}
-            </>
-          )}
-
-          {nextTour && !creatingInvoice && (
-            <Button variant="primary" onClick={handleVisitSubmit}>
-              ثبت بازدید
+          {/* دکمه‌ها */}
+          <div className="mt-3 d-flex gap-2">
+            <Button variant="primary" onClick={() => setShowProductModal(true)}>
+              ➕ افزودن کالا
             </Button>
-          )}
-
-          {creatingInvoice && invoiceItems.length > 0 && (
-            <Button variant="success" onClick={handleInvoiceSubmit}>
-              ثبت فاکتور
+            <Button variant="warning" onClick={() => setShowNextTourModal(true)}>
+              📅 ثبت تور بعد
             </Button>
-          )}
+          </div>
 
-          {creatingInvoice && (
+          {/* جدول کالاها */}
+          {invoiceItems.length > 0 && (
             <>
               <hr />
-              <h5>اقلام فاکتور</h5>
+              <h5>🛒 اقلام فاکتور</h5>
               <Table striped bordered hover>
                 <thead>
                   <tr>
@@ -232,91 +137,65 @@ export default function VisitsClient({ routes }) {
                 <tbody>
                   {invoiceItems.map((item, idx) => (
                     <tr key={idx}>
-                      <td style={{ position: "relative" }}>
-                        <Form.Control
-                          type="text"
-                          placeholder="نام یا کد محصول"
-                          value={item.product_input || ""}
-                          onChange={(e) =>
-                            handleProductInput(idx, e.target.value)
-                          }
-                        />
-                        {suggestions.length > 0 && (
-                          <div
-                            style={{
-                              position: "absolute",
-                              background: "white",
-                              border: "1px solid #ccc",
-                              zIndex: 10,
-                              width: "100%",
-                              maxHeight: "150px",
-                              overflowY: "auto",
-                            }}
-                          >
-                            {suggestions.map((p) => (
-                              <div
-                                key={p.id}
-                                style={{ padding: "5px", cursor: "pointer" }}
-                                onClick={() => selectProduct(idx, p)}
-                              >
-                                {p.name} ({p.code})
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </td>
+                      <td>{item.product_input}</td>
+                      <td>{item.quantity}</td>
+                      <td>{item.weight}</td>
+                      <td>{item.price.toLocaleString()}</td>
                       <td>
-                        <Form.Control
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) =>
-                            updateItem(idx, "quantity", e.target.value)
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Form.Control
-                          type="number"
-                          value={item.weight}
-                          onChange={(e) =>
-                            updateItem(idx, "weight", e.target.value)
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Form.Control
-                          type="number"
-                          value={item.price}
-                          onChange={(e) =>
-                            updateItem(idx, "price", e.target.value)
-                          }
-                        />
-                      </td>
-                      <td>
-                        <Button
-                          variant="danger"
-                          size="sm"
-                          onClick={() => removeItem(idx)}
-                        >
-                          -
+                        <Button variant="danger" size="sm" onClick={() => removeItem(idx)}>
+                          حذف
                         </Button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </Table>
-              <Button variant="secondary" onClick={addItem}>
-                + افزودن کالا
-              </Button>
-
               <div className="mt-2">
-                <strong>مجموع مبلغ فاکتور: </strong>{" "}
+                <strong>مجموع مبلغ فاکتور: </strong>
                 {totalAmount.toLocaleString()} تومان
               </div>
+
+              <Button variant="success" className="mt-3" onClick={handleInvoiceSubmit}>
+                ✅ ثبت نهایی فاکتور
+              </Button>
             </>
           )}
         </>
       )}
+
+      {/* مدال انتخاب کالا */}
+      <ProductAutoCompleteModal
+        show={showProductModal}
+        onClose={() => setShowProductModal(false)}
+        onAdd={handleAddProduct}
+        products={products}
+      />
+
+      {/* مدال ثبت تور بعد */}
+      <Modal show={showNextTourModal} onHide={() => setShowNextTourModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>📅 ثبت تور بعد</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form.Group>
+            <Form.Label>توضیحات:</Form.Label>
+            <Form.Control
+              as="textarea"
+              rows={3}
+              value={visitNote}
+              onChange={(e) => setVisitNote(e.target.value)}
+            />
+          </Form.Group>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowNextTourModal(false)}>
+            ❌ بستن
+          </Button>
+          <Button variant="primary" onClick={handleNextTourSubmit}>
+            ✅ ثبت تور بعد
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 }

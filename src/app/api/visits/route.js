@@ -6,7 +6,7 @@ export async function POST(req) {
 
     // آیا بازدید امروز ثبت شده؟
     const [existing] = await db.query(
-      "SELECT id FROM visits WHERE store_id = ? AND visit_date = CURDATE()",
+      "SELECT id, has_invoice, note, next_tour FROM visits WHERE store_id = ? AND visit_date = CURDATE()",
       [storeId]
     );
 
